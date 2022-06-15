@@ -1,15 +1,13 @@
-import requests, base58, time
+import requests, base58, time, zipfile
+from sqlalchemy import false
 
 GATEWAYS = [
-            'https://cloudflare-ipfs.com/ipfs/',
-            'https://gateway.pinata.cloud/ipfs/',
-            'https://gateway.ipfs.io/ipfs/',
-            'https://ipfs.io/ipfs/',
-            'https://ipfs.cf-ipfs.com/ipfs/',
-            'https://ipfs.fleek.co/ipfs/',
-            'https://cf-ipfs.com/ipfs/',
-            'https://bluelight.link/ipfs/',
-            'https://dweb.link/ipfs/'
+            'https://ipfs.infura.io/ipfs/',
+            'https://infura-ipfs.io/ipfs/',
+
+            # Use these only if the above 2 gateways are not working.
+            # 'https://nftstorage.link/ipfs/'            
+            # 'https://gateway.pinata.cloud/ipfs/',
             ]
 
 def encode_string(param, fn_id='0x5d58ebc1'):
@@ -25,7 +23,7 @@ def encode_string(param, fn_id='0x5d58ebc1'):
     return fn_id + line2 + line3 + param_line
 
 def network_read(params):
-    url = 'https://rpc-mainnet.matic.quiknode.pro'
+    url = 'https://polygon-rpc.com'
     payload = {"jsonrpc": "2.0", "method": "eth_call", "params": params, "id": 1}
     headers = {"Content-Type": "application/json"}
     r = requests.post(url,
@@ -66,48 +64,107 @@ def hash_to_cid(hash_id):
     hash_id = int(hash_id, 16)
     return base58.b58encode_int(hash_id).decode('utf-8')
 
-def get_from_ipfs(hash_id, challenge, gateways, verbose = True):
+def get_from_ipfs(hash_id, challenge, gateways, unlimited_search=False, verbose = False):
     filename = 'challenge_{}_dataset.zip'.format(challenge)
-    base_timeout=15
-    timeout = base_timeout
-    chunk_size = 4096
+    request_timeout = 300
+    chunk_size = 1024 * 4
     gateway_length = len(gateways)
-    max_retries = gateway_length * 3
+    tries_per_gateway = 20
+    max_retries = gateway_length * tries_per_gateway
     retries = 0
     gateway_index = 0
-    no_redirects = '#x-ipfs-companion-no-redirect'
-    if verbose: 
-        print('Retrieving dataset for challenge {}..'.format(challenge))
-        print('(Please do not unzip the file until the download is complete.)')
-    while retries < max_retries:
+    downloaded = 0
+    mode = 'wb'
+    start_time = time.time()
+    print('Retrieving dataset for challenge {}. (Please do not unzip the file until the download is complete.)'.format(challenge))
+    print('Download times may take up to several hours. If your download is taking too long, please download the dataset file directly from https://competition.rocketcapital.ai.')
+    while True:
+        if not unlimited_search:
+            if retries >= max_retries:
+                break
         try:
             gateway = gateways[gateway_index]
             r = requests.get(
-            gateway + hash_to_cid(hash_id) + no_redirects,
-            timeout=1,stream=True)
-            with open('{}'.format(filename), 'wb') as f:
-                start_time = time.time()
+            gateway + hash_to_cid(hash_id),
+            timeout=request_timeout,
+            stream=True,
+            headers={'Range':'bytes={}-2147483648'.format(downloaded)}
+            )
+
+            assert r.ok, 'Unable to get proper response. Reconnecting..'
+            total_size = int(r.headers.get('content-length'))
+                
+            if downloaded > 0: 
+                mode = 'ab'
+            else:
+                actual_total_size = total_size
+            
+            with open('{}'.format(filename), mode) as f:
                 for chunk in r.iter_content(chunk_size=chunk_size):
                     if chunk:
                         f.write(chunk)
-                    if time.time() - start_time > timeout:
-                        raise Exception('Request timeout.')
+                        downloaded += chunk_size
+                        print(end='\r')
+                        pct_progress = downloaded * 100 / actual_total_size
+                        elapsed = time.time() - start_time
+                        est_time_remaining = int(1.7 * elapsed * actual_total_size / downloaded)
+                        hours, mins = est_time_remaining // 3600, est_time_remaining % 3600 // 60 + 1
+                        print('Download Progress: {:.3f}% (Estimated time remaining: {} h {} min)'.format(pct_progress, hours, mins), end=' ')
 
-            if verbose: print('Dataset saved to {}'.format(filename))
+            assert downloaded >= actual_total_size, 'Download halted. Reconnecting..'
+
+            try:
+                with zipfile.ZipFile(filename, 'r') as zip_ref:
+                    zip_ref.extractall()
+            except:
+                downloaded = 0
+                mode = 'wb'
+                retries += 1
+                print(end='\r')
+                print('Retrying download..', end='')
+                continue
+            print(end='\r')
+            print('Download Progress: {:.3f}% (Estimated time remaining: 0 h 0 min)'.format(pct_progress), end=' ')
+            print('\nDataset saved and unzipped to "dataset" folder.')
             return filename
-        except:
+        
+        except Exception as e:
+            print(end='\r')
+            if verbose: print(e)
             retries += 1
-            gateway_index = (gateway_index + 1) % gateway_length
-            timeout = (1 + (retries // gateway_length)) * base_timeout
-    
+            if retries % tries_per_gateway == 0:
+                gateway_index += 1
+                gateway_index %= gateway_length
+        
+        
     print('Gateways unavailable. Please try again later.')
     raise Exception('Gateways unavailable. Please try again later.')
     
 
-def download_dataset(challenge = None, competition_name = 'ROCKET', verbose = True):
+def download_dataset(challenge = None, competition_name = 'ROCKET', verbose = False):
     competition = get_competition_address(competition_name)
     if challenge is None:
         challenge = get_latest_challenge(competition)
     hash_id = get_dataset_hash(competition, challenge)
-    filename = get_from_ipfs(hash_id, challenge, gateways=GATEWAYS, verbose=True)
+    filename = get_from_ipfs(hash_id, challenge, gateways=GATEWAYS, unlimited_search=False, verbose=verbose)
     return filename
+
+
+def get_best_gateway(gateway_list=GATEWAYS):
+    postfix = 'bafybeifx7yeb55armcsxwwitkymga5xf53dxiarykms3ygqic223w5sk3m#x-ipfs-companion-no-redirect'
+    gateways_sorted = []
+    for gateway in gateway_list:
+        try:
+            start = time.time()
+            r = requests.get(gateway + postfix, timeout=10)
+            if r.ok:
+                end = time.time()
+                gateways_sorted.append((gateway, end - start))
+        except:
+            continue
+    
+    assert len(gateways_sorted) > 0, 'No suitable gateway found. Please try again.'
+    gateways_sorted.sort(key=lambda x: x[1])
+    gateways = list(map(lambda x: x[0], gateways_sorted))
+    return gateways[0]
+    
