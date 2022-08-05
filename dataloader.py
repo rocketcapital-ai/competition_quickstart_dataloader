@@ -1,14 +1,6 @@
 import requests, base58, time, zipfile
 from sqlalchemy import false
 
-GATEWAYS = [
-            'https://ipfs.infura.io/ipfs/',
-            'https://infura-ipfs.io/ipfs/',
-
-            # Use these only if the above 2 gateways are not working.
-            # 'https://nftstorage.link/ipfs/'            
-            # 'https://gateway.pinata.cloud/ipfs/',
-            ]
 
 def encode_string(param, fn_id='0x5d58ebc1'):
     line2 = '0' * 62 + '20'
@@ -64,18 +56,20 @@ def hash_to_cid(hash_id):
     hash_id = int(hash_id, 16)
     return base58.b58encode_int(hash_id).decode('utf-8')
 
-def get_from_ipfs(hash_id, challenge, gateways, unlimited_search=False, verbose = False):
+def get_from_ipfs(hash_id, challenge, gateway, unlimited_search=False, verbose = False):
     filename = 'challenge_{}_dataset.zip'.format(challenge)
     request_timeout = 300
     chunk_size = 1024 * 4
-    gateway_length = len(gateways)
     tries_per_gateway = 20
-    max_retries = gateway_length * tries_per_gateway
+    max_retries = tries_per_gateway
     retries = 0
     gateway_index = 0
     downloaded = 0
     mode = 'wb'
     start_time = time.time()
+    if gateway[-1] != '/':
+        gateway += '/'
+    gateway += 'ipfs/'
     print('Retrieving dataset for challenge {}. (Please do not unzip the file until the download is complete.)'.format(challenge))
     print('Download times may take up to several hours. If your download is taking too long, please download the dataset file directly from https://competition.rocketcapital.ai.')
     while True:
@@ -83,7 +77,6 @@ def get_from_ipfs(hash_id, challenge, gateways, unlimited_search=False, verbose 
             if retries >= max_retries:
                 break
         try:
-            gateway = gateways[gateway_index]
             r = requests.get(
             gateway + hash_to_cid(hash_id),
             timeout=request_timeout,
@@ -137,34 +130,14 @@ def get_from_ipfs(hash_id, challenge, gateways, unlimited_search=False, verbose 
                 gateway_index %= gateway_length
         
         
-    print('Gateways unavailable. Please try again later.')
-    raise Exception('Gateways unavailable. Please try again later.')
+    print('Gateway {} is unavailable. Please try again later.'.format(gateway))
+    raise Exception('Gateway {} is unavailable. Please try again later.'.format(gateway))
     
 
-def download_dataset(challenge = None, competition_name = 'ROCKET', verbose = False):
+def download_dataset(gateway: str, challenge = None, competition_name = 'ROCKET', verbose = False):
     competition = get_competition_address(competition_name)
     if challenge is None:
         challenge = get_latest_challenge(competition)
     hash_id = get_dataset_hash(competition, challenge)
-    filename = get_from_ipfs(hash_id, challenge, gateways=GATEWAYS, unlimited_search=False, verbose=verbose)
+    filename = get_from_ipfs(hash_id, challenge, gateway=gateway, unlimited_search=False, verbose=verbose)
     return filename
-
-
-def get_best_gateway(gateway_list=GATEWAYS):
-    postfix = 'bafybeifx7yeb55armcsxwwitkymga5xf53dxiarykms3ygqic223w5sk3m#x-ipfs-companion-no-redirect'
-    gateways_sorted = []
-    for gateway in gateway_list:
-        try:
-            start = time.time()
-            r = requests.get(gateway + postfix, timeout=10)
-            if r.ok:
-                end = time.time()
-                gateways_sorted.append((gateway, end - start))
-        except:
-            continue
-    
-    assert len(gateways_sorted) > 0, 'No suitable gateway found. Please try again.'
-    gateways_sorted.sort(key=lambda x: x[1])
-    gateways = list(map(lambda x: x[0], gateways_sorted))
-    return gateways[0]
-    
