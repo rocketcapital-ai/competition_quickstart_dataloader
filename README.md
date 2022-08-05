@@ -15,4 +15,4 @@ Users are encouraged to obtain a (free) IPFS gateway url from [Infura](https://i
 ### Steps to obtain gateway url and continue running the scripts in this repo
 1. Open an Infura account and obtain a dedicated Infura IPFS gateway url according to [this](https://docs.infura.io/infura/networks/ipfs/how-to/access-ipfs-content/dedicated-gateways).
 2. Make sure that "Pinned Content Only" is **not checked**.
-3. In `Quickstart.ipynb`, paste your new url into the `my_gateway` variable in the first cell. <br>Your url should be of the form *https://<custom-subdomain>.infura-ipfs.io*
+3. In `Quickstart.ipynb`, paste your new url into the `my_gateway` variable in the first cell. <br>Your url should be of the form "https://*custom-subdomain*.infura-ipfs.io"
