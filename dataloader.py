@@ -1,5 +1,9 @@
 import requests, base58, time, zipfile
-from sqlalchemy import false
+
+
+class COMPETITION_NAME:
+    UPDOWN = "UPDOWN"
+    NEUTRAL = "NEUTRAL"
 
 
 def encode_string(param, fn_id='0x5d58ebc1'):
@@ -14,8 +18,9 @@ def encode_string(param, fn_id='0x5d58ebc1'):
         param_line += utf8_encoded + padding
     return fn_id + line2 + line3 + param_line
 
+
 def network_read(params):
-    url = 'https://polygon-rpc.com'
+    url = 'https://rpc.ankr.com/polygon_mumbai'
     payload = {"jsonrpc": "2.0", "method": "eth_call", "params": params, "id": 1}
     headers = {"Content-Type": "application/json"}
     r = requests.post(url,
@@ -23,13 +28,15 @@ def network_read(params):
                       json=payload)
     return r.json()['result']
 
+
 def get_competition_address(competition_name = 'ROCKET'):
-    registry = '0x0Ee5AFF42564C0D293164b39D85653666ae151Eb'
+    registry = '0x98cEa95085397F45007bC5F1A1B859F8E87bD6C3'
     data = encode_string(competition_name)
     params = [{'to': registry,
                'data': data},
               'latest']
     return '0x{}'.format(network_read(params)[-40:])
+
 
 def get_latest_challenge(competition):
     fn_id = '0x736d8c91'
@@ -37,6 +44,7 @@ def get_latest_challenge(competition):
                'data': fn_id},
               'latest']
     return int(network_read(params), 16)
+
 
 def get_dataset_hash(competition, challenge=None):
     fn_id = '0x39e28777'
@@ -50,11 +58,13 @@ def get_dataset_hash(competition, challenge=None):
               'latest']
     return network_read(params)
 
+
 def hash_to_cid(hash_id):
     if hash_id[:2] == '0x': hash_id = hash_id[2:]
     hash_id = '1220' + str(hash_id)
     hash_id = int(hash_id, 16)
     return base58.b58encode_int(hash_id).decode('utf-8')
+
 
 def get_from_ipfs(hash_id, challenge, gateway, unlimited_search=False, verbose = False):
     filename = 'challenge_{}_dataset.zip'.format(challenge)
@@ -63,7 +73,6 @@ def get_from_ipfs(hash_id, challenge, gateway, unlimited_search=False, verbose =
     tries_per_gateway = 20
     max_retries = tries_per_gateway
     retries = 0
-    gateway_index = 0
     downloaded = 0
     mode = 'wb'
     start_time = time.time()
@@ -120,21 +129,17 @@ def get_from_ipfs(hash_id, challenge, gateway, unlimited_search=False, verbose =
             print('Download Progress: {:.3f}% (Estimated time remaining: 0 h 0 min)'.format(pct_progress), end=' ')
             print('\nDataset saved and unzipped to "dataset" folder.')
             return filename
-        
+
         except Exception as e:
             print(end='\r')
             if verbose: print(e)
             retries += 1
-            if retries % tries_per_gateway == 0:
-                gateway_index += 1
-                gateway_index %= gateway_length
-        
-        
+
     print('Gateway {} is unavailable. Please try again later.'.format(gateway))
     raise Exception('Gateway {} is unavailable. Please try again later.'.format(gateway))
-    
 
-def download_dataset(gateway: str, challenge = None, competition_name = 'ROCKET', verbose = False):
+
+def download_dataset(gateway: str, challenge = None, competition_name=COMPETITION_NAME.UPDOWN, verbose = False):
     competition = get_competition_address(competition_name)
     if challenge is None:
         challenge = get_latest_challenge(competition)
