@@ -20,7 +20,7 @@ def encode_string(param, fn_id='0x5d58ebc1'):
 
 
 def network_read(params):
-    url = 'https://rpc.ankr.com/polygon_mumbai'
+    url = 'https://polygon-rpc.com'
     payload = {"jsonrpc": "2.0", "method": "eth_call", "params": params, "id": 1}
     headers = {"Content-Type": "application/json"}
     r = requests.post(url,
@@ -30,7 +30,7 @@ def network_read(params):
 
 
 def get_competition_address(competition_name = 'ROCKET'):
-    registry = '0x98cEa95085397F45007bC5F1A1B859F8E87bD6C3'
+    registry = '0x97392b5bf12b70Ab7Eff76a4B9130d69ED48f23D'
     data = encode_string(competition_name)
     params = [{'to': registry,
                'data': data},
