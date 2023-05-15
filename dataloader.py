@@ -80,7 +80,7 @@ def get_from_ipfs(hash_id, challenge, gateway, unlimited_search=False, verbose =
         gateway += '/'
     gateway += 'ipfs/'
     print('Retrieving dataset for challenge {}. (Please do not unzip the file until the download is complete.)'.format(challenge))
-    print('Download times may take up to several hours. If your download is taking too long, please download the dataset file directly from https://competition.rocketcapital.ai.')
+    print('Download times may take up to several hours. If your download is taking too long, please download the dataset file directly from https://yiedl-comp.web.app.')
     while True:
         if not unlimited_search:
             if retries >= max_retries:
