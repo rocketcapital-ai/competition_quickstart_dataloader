@@ -66,7 +66,7 @@ def hash_to_cid(hash_id):
     return base58.b58encode_int(hash_id).decode('utf-8')
 
 
-def get_from_ipfs(hash_id, challenge, gateway, unlimited_search=False, verbose = False):
+def get_from_ipfs(hash_id, challenge, gateway, access_token=None, unlimited_search=False, verbose = False):
     filename = 'challenge_{}_dataset.zip'.format(challenge)
     request_timeout = 300
     chunk_size = 1024 * 4
@@ -86,11 +86,15 @@ def get_from_ipfs(hash_id, challenge, gateway, unlimited_search=False, verbose =
             if retries >= max_retries:
                 break
         try:
+            headers = {'Range': 'bytes={}-2147483648'.format(downloaded)}
+            if access_token is not None:
+                headers['x-pinata-gateway-token'] = access_token
+
             r = requests.get(
             gateway + hash_to_cid(hash_id),
             timeout=request_timeout,
             stream=True,
-            headers={'Range':'bytes={}-2147483648'.format(downloaded)}
+            headers=headers
             )
 
             assert r.ok, 'Unable to get proper response. Reconnecting..'
@@ -139,10 +143,10 @@ def get_from_ipfs(hash_id, challenge, gateway, unlimited_search=False, verbose =
     raise Exception('Gateway {} is unavailable. Please try again later.'.format(gateway))
 
 
-def download_dataset(gateway: str, challenge = None, competition_name=COMPETITION_NAME.UPDOWN, verbose = False):
+def download_dataset(gateway: str, access_token=None, challenge = None, competition_name=COMPETITION_NAME.UPDOWN, verbose = False):
     competition = get_competition_address(competition_name)
     if challenge is None:
         challenge = get_latest_challenge(competition)
     hash_id = get_dataset_hash(competition, challenge)
-    filename = get_from_ipfs(hash_id, challenge, gateway=gateway, unlimited_search=False, verbose=verbose)
+    filename = get_from_ipfs(hash_id, challenge, gateway=gateway, access_token=access_token, unlimited_search=False, verbose=verbose)
     return filename
