@@ -5,6 +5,11 @@ class COMPETITION_NAME:
     UPDOWN = "UPDOWN"
     NEUTRAL = "NEUTRAL"
 
+COMPETITION_ADDRESSES = {
+    COMPETITION_NAME.UPDOWN: "0xEcB9716867f9300F2706EdbB5b81c7a0AbDC5B29",
+    COMPETITION_NAME.NEUTRAL: "0xC8519524013348466e18fC1747d11F1feA9473fd"
+}
+
 
 def encode_string(param, fn_id='0x5d58ebc1'):
     line2 = '0' * 62 + '20'
@@ -29,13 +34,8 @@ def network_read(params):
     return r.json()['result']
 
 
-def get_competition_address(competition_name = 'ROCKET'):
-    registry = '0x97392b5bf12b70Ab7Eff76a4B9130d69ED48f23D'
-    data = encode_string(competition_name)
-    params = [{'to': registry,
-               'data': data},
-              'latest']
-    return '0x{}'.format(network_read(params)[-40:])
+def get_competition_address(competition_name):
+    return COMPETITION_ADDRESSES[competition_name]
 
 
 def get_latest_challenge(competition):
