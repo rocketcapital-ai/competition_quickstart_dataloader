@@ -25,7 +25,7 @@ def encode_string(param, fn_id='0x5d58ebc1'):
 
 
 def network_read(params):
-    url = 'https://polygon-rpc.com'
+    url = 'https://polygon.drpc.org'
     payload = {"jsonrpc": "2.0", "method": "eth_call", "params": params, "id": 1}
     headers = {"Content-Type": "application/json"}
     r = requests.post(url,
